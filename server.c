@@ -4,6 +4,7 @@
 #include<unistd.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
+#include "fastcgi.c"
 #define PORT 8084
 
 void errorHandling(char *message);
@@ -13,10 +14,10 @@ void sendData(void *sock, char *filename); // 向浏览器发送请求文件的�
 void catHTML(void *sock, char *filename); // 读取HTML文件内容
 void catJPEG(void *sock, char *filename); // 读取图像文件内容
 void sendError(void *sock);         // 请求出错响应
+void catPHP(void *sock, char *filename, char  *query);
 
 
-int main(int argc, char *argv[]) {
-	int serv_sock;
+int main(int argc, char *argv[]) { int serv_sock;
 	int clnt_sock;
 
 	char buf[1024];
@@ -203,32 +204,57 @@ void sendError(void *sock){
     write(clnt_sock, body, sizeof(body));
 }
 
-typedef struct {
-	unsigned char version;
-	unsigned char type;
-	unsigned char requestIdB1;
-	unsigned char requestIdB0;
-	unsigned char contentLengthB1;
-	unsigned char contentLengthB0;
-	unsigned char paddingLength;
-	unsigned char reserved;
-}FCGI_Header;
 
-typedef struct {
-	unsigned char roleB1;
-	unsigned char roleB0;
-	unsigned char flags;
-	unsigned char reserved[5];
-}FCGI_BeginRequestBody;
+void catPHP(void *sockc, char *filename, char *query) {
+	int clnt_sock = *((int*) sockc); 
+	int sock;
+	struct sockaddr_in serv_addr;
+	int str_len;
+	int contentLengthR;
+	char msg[50];
+	char buf[1024]; 
+	char status[] = "HTTP/1.0 200 OK\r\n";
+	char headers[] = "Server:A Simple Web Server\r\n";
+	sock = socket(PF_INET, SOCK_STREAM, 0); 
+	if (-1 == sock) {
+		errorHandling("sock error()");	
+	}
+	memset(&serv_addr, 0, sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = inet_addr(FCGI_HOST); 
+	serv_addr.sin_port = htons(FCGI_PORT);
+	if (-1 == connect(sock,(struct sockaddr*)&serv_addr, sizeof(serv_addr))) {
+		errorHandling("connect error");	
+	}
 
-typedef struct {
-	FCGI_Header header;
-	FCGI_BeginRequestBody body;
-}FCGI_BeginRequestRecord;
 
-typedef struct {
-	FCGI_Header header;
-	unsigned char nameLength;
-	unsigned char valueLength;
-	unsigned char data[0];
-}FCGI_ParamsRecord;
+	FCGI_BeginRequestRecord beginRecord;
+	beginRecord.header = makeHeader(FCGI_BEGIN_REQUEST, FCGI_REQUEST_ID, sizeof(beginRecord.body), 0);
+	beginRecord.body = makeBeginRequestBody(FCGI_RESPONDER);
+	str_len = write(sock, &beginRecord, sizeof(beginRecord));
+	char *params[][2] = {
+		{"SCRIPT_FILENAME", "/home/vagrant/webserver/1.php"},
+		{"REQUEST_METHOD", "GET"},
+		{"QUERY_STRING", "name=ystop"},
+		{"", ""}
+	};
+	int i,contentLength,paddingLength;
+	FCGI_ParamsRecord *paramsRecordp;
+	for (i = 0;params[i][0] != "";i++) {
+		contentLength = strlen(params[i][0]) + strlen(params[i][1]) + 2;
+		paddingLength = (contentLength % 8) == 0 ? 0 : 8 - (contentLength % 8);
+		paramsRecordp = (FCGI_ParamsRecord *)malloc(sizeof(FCGI_ParamsRecord) + contentLength + paddingLength);
+		paramsRecordp->nameLength = (unsigned char)strlen(params[i][0]);
+		paramsRecordp->valueLength = (unsigned char)strlen(params[i][1]);
+		paramsRecordp->header = makeHeader(FCGI_PARAMS, FCGI_REQUEST_ID, contentLength, paddingLength);
+		memset(paramsRecordp->data, 0, contentLength+paddingLength);
+		memcpy(paramsRecordp->data, params[i][0], strlen(params[i][0]));
+		memcpy(paramsRecordp->data + strlen(params[i][0]), params[i][1], strlen(params[i][1]));
+		str_len = write(sock, paramsRecordp, 8 + contentLength + paddingLength);
+		if (-1 == str_len) {
+			errorHandling("Write beginRecord failed!");	
+		}
+		printf("Write params %s %s\n",params[i][0], params[i][1]);
+		free(paramsRecordp);
+	}
+}
