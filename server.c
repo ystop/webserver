@@ -116,12 +116,20 @@ void sendData(void *sock, char *filename) {
 	int clnt_sock = *((int *) sock);
 	char buf[20];
 	char ext[10];
-	strcpy(buf,filename);
+    char query[100];
+    // 提取查询字符串
+    if(NULL != strstr(filename, "?")){
+        strcpy(buf, strtok(filename, "?"));
+        strcpy(query, strtok(NULL, "?"));
+    }else{
+        strcpy(buf, filename);
+        strcpy(query, "name=123456");
+    }
 
 	strtok(buf, ".");
 	strcpy(ext, strtok(NULL, "."));
 	if (0 == strcmp(ext, "php")) {
-        catPHP(sock,filename,"");
+        catPHP(sock,filename,query);
 	} else if (0 == strcmp(ext, "html")) {
 		catHTML(sock, filename);
 	} else if (0 == strcmp(ext, "jpg")) {
@@ -232,10 +240,12 @@ void catPHP(void *sockc, char *filename, char *query) {
 	beginRecord.header = makeHeader(FCGI_BEGIN_REQUEST, FCGI_REQUEST_ID, sizeof(beginRecord.body), 0);
 	beginRecord.body = makeBeginRequestBody(FCGI_RESPONDER);
 	str_len = write(sock, &beginRecord, sizeof(beginRecord));
+    strcpy(msg, "/home/vagrant/webserver/");
+    strcat(msg, filename);
 	char *params[][2] = {
-		{"SCRIPT_FILENAME", "/home/vagrant/webserver/1.php"},
+		{"SCRIPT_FILENAME", msg},
 		{"REQUEST_METHOD", "GET"},
-		{"QUERY_STRING", "name=ystop"},
+		{"QUERY_STRING", query},
 		{"", ""}
 	};
 	int i,contentLength,paddingLength;
