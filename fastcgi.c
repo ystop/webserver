@@ -11,14 +11,14 @@ FCGI_Header makeHeader (
 	header.type = (unsigned char) type;
 	header.requestIdB1 = (unsigned char) ((requestId >> 8)&0xff);
 	header.requestIdB0 = (unsigned char) ((requestId     )&0xff);
-	header.contentLengthB1 = (unsigned char) ((requestId>>8)&0xff);
-	header.contentLengthB0 = (unsigned char)((requestId   )&0xff);
+	header.contentLengthB1 = (unsigned char) ((contentLength>>8)&0xff);
+	header.contentLengthB0 = (unsigned char)((contentLength   )&0xff);
 	header.paddingLength = (unsigned char)paddingLength;
 	header.reserved = 0;
 	return header;
 }
 
-FCGI_BeginRequestBody makeBeginRequstBody(int role)
+FCGI_BeginRequestBody makeBeginRequestBody(int role)
 {
 	FCGI_BeginRequestBody body;
 	body.roleB1 = (unsigned char)((role >>8)&0xff);

@@ -44,13 +44,13 @@ typedef struct {
 }FCGI_ParamsRecord;
 
 FCGI_Header makeHeader (
-	int type;
-	int requestId;
-	int contentLength;
-	int paddingLength;
+	int type,
+	int requestId,
+	int contentLength,
+	int paddingLength
 );
 
 FCGI_BeginRequestBody makeBeginRequestBody (
-	int role;	
+	int role	
 );
 

@@ -121,7 +121,7 @@ void sendData(void *sock, char *filename) {
 	strtok(buf, ".");
 	strcpy(ext, strtok(NULL, "."));
 	if (0 == strcmp(ext, "php")) {
-		//
+        catPHP(sock,filename,"");
 	} else if (0 == strcmp(ext, "html")) {
 		catHTML(sock, filename);
 	} else if (0 == strcmp(ext, "jpg")) {
@@ -214,7 +214,7 @@ void catPHP(void *sockc, char *filename, char *query) {
 	char msg[50];
 	char buf[1024]; 
 	char status[] = "HTTP/1.0 200 OK\r\n";
-	char headers[] = "Server:A Simple Web Server\r\n";
+	char header[] = "Server:A Simple Web Server\r\n";
 	sock = socket(PF_INET, SOCK_STREAM, 0); 
 	if (-1 == sock) {
 		errorHandling("sock error()");	
@@ -257,4 +257,27 @@ void catPHP(void *sockc, char *filename, char *query) {
 		printf("Write params %s %s\n",params[i][0], params[i][1]);
 		free(paramsRecordp);
 	}
+
+    FCGI_Header stdinHeader;
+    stdinHeader = makeHeader(FCGI_STDIN, FCGI_REQUEST_ID, 0 , 0);
+    write(sock, &stdinHeader, sizeof(stdinHeader));
+    FCGI_Header respHeader;
+    char *message;
+    str_len = read(sock, &respHeader, 8);
+    if ( -1 == str_len) {
+        errorHandling("read responder failed!");
+    }
+    
+    if (respHeader.type == FCGI_STDOUT) {
+        contentLengthR = 
+            ((int)respHeader.contentLengthB1 << 8) + (int)respHeader.contentLengthB0;
+        message = (char *)malloc(contentLengthR);
+        read(sock, message, contentLengthR);
+    }
+    write(clnt_sock, status, strlen(status));
+    write(clnt_sock, header, strlen(header));
+    write(clnt_sock, message, contentLengthR);
+    free(message);
+    close(clnt_sock);
 }
+
